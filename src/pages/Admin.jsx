@@ -10,12 +10,6 @@ const DOCS = [
   { key: 'licencia', label: 'Licencia', icon: '🚗' },
 ]
 
-const STATUS_COLOR = {
-  completado: '#22c55e',
-  parcial: '#f59e0b',
-  pendiente: '#ef4444',
-}
-
 export default function Admin() {
   const [candidatos, setCandidatos] = useState([])
   const [docs, setDocs] = useState({})
@@ -49,7 +43,7 @@ export default function Admin() {
 
   const filtered = filter === 'todos'
     ? candidatos
-    : candidatos.filter(c => c.form_status === filter || c.etapa === filter)
+    : candidatos.filter(c => c.form_status === filter)
 
   const stats = {
     total: candidatos.length,
@@ -58,254 +52,196 @@ export default function Admin() {
     pendiente: candidatos.filter(c => !c.form_status || c.form_status === 'pendiente').length,
   }
 
+  const statusConfig = {
+    completado: { color: '#4ade80', bg: 'rgba(74,222,128,0.08)', label: 'Completo' },
+    parcial:    { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', label: 'Parcial' },
+    pendiente:  { color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', label: 'Pendiente' },
+  }
+
   return (
-    <div style={styles.page}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div>
-          <div style={styles.logo}>B2B<span style={{ color: 'var(--accent)' }}>.</span>Admin</div>
-          <p style={styles.sub}>Panel de documentos de candidatos</p>
-        </div>
-        <button style={styles.refreshBtn} onClick={fetchAll}>↻ Actualizar</button>
-      </div>
-
-      {/* Stats */}
-      <div style={styles.statsRow}>
-        {[
-          { label: 'Total', value: stats.total, color: '#6366f1' },
-          { label: 'Completos', value: stats.completado, color: '#22c55e' },
-          { label: 'Parciales', value: stats.parcial, color: '#f59e0b' },
-          { label: 'Pendientes', value: stats.pendiente, color: '#ef4444' },
-        ].map(s => (
-          <div key={s.label} style={{ ...styles.statCard, borderColor: s.color + '44' }}>
-            <div style={{ ...styles.statNum, color: s.color }}>{s.value}</div>
-            <div style={styles.statLabel}>{s.label}</div>
+    <div style={s.root}>
+      <div style={s.gridBg} />
+      <div style={s.wrap}>
+        <header style={s.header}>
+          <div>
+            <div style={s.logo}>B2B <span style={s.logoDot}>Latam</span></div>
+            <p style={s.logoSub}>Panel de documentos</p>
           </div>
-        ))}
-      </div>
-
-      {/* Filter */}
-      <div style={styles.filters}>
-        {['todos', 'completado', 'parcial', 'pendiente'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            style={{ ...styles.filterBtn, ...(filter === f ? styles.filterActive : {}) }}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
+          <button style={s.refreshBtn} onClick={fetchAll}>
+            <span style={{ fontSize: 14 }}>↻</span> Actualizar
           </button>
-        ))}
-      </div>
+        </header>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>Cargando...</div>
-      ) : (
-        <div style={styles.table}>
-          <div style={styles.tableHeader}>
+        <div style={s.statsGrid}>
+          {[
+            { label: 'Total', value: stats.total, accent: '#e2e8f0' },
+            { label: 'Completos', value: stats.completado, accent: '#4ade80' },
+            { label: 'Parciales', value: stats.parcial, accent: '#60a5fa' },
+            { label: 'Pendientes', value: stats.pendiente, accent: '#94a3b8' },
+          ].map(s2 => (
+            <div key={s2.label} style={{ ...s.statCard, borderColor: s2.accent + '22' }}>
+              <div style={{ ...s.statNum, color: s2.accent }}>{s2.value}</div>
+              <div style={s.statLabel}>{s2.label}</div>
+              <div style={{ ...s.statBar, background: s2.accent + '15' }}>
+                <div style={{
+                  ...s.statBarFill,
+                  width: `${stats.total ? (s2.value / stats.total) * 100 : 0}%`,
+                  background: s2.accent,
+                }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={s.filterRow}>
+          {['todos', 'completado', 'parcial', 'pendiente'].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              style={{ ...s.filterBtn, ...(filter === f ? s.filterActive : {}) }}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+          <span style={s.filterCount}>{filtered.length} candidatos</span>
+        </div>
+
+        <div style={s.table}>
+          <div style={s.tableHead}>
             <span>Candidato</span>
             <span>Ciudad</span>
-            <span style={{ textAlign: 'center' }}>Docs</span>
+            <span style={{ textAlign: 'center' }}>Documentos</span>
             <span style={{ textAlign: 'center' }}>Estado</span>
             <span></span>
           </div>
-          {filtered.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>
-              Sin candidatos en esta categoría
-            </div>
+
+          {loading && <div style={s.empty}><div style={s.pulse} /></div>}
+          {!loading && filtered.length === 0 && (
+            <div style={s.empty}><span style={{ color: '#475569', fontSize: 13 }}>Sin candidatos</span></div>
           )}
-          {filtered.map(c => {
+
+          {!loading && filtered.map(c => {
             const candDocs = docs[c.id] || {}
             const uploaded = DOCS.filter(d => candDocs[d.key]).length
             const status = c.form_status || 'pendiente'
+            const sc = statusConfig[status] || statusConfig.pendiente
+            const isOpen = selected?.id === c.id
+
             return (
-              <div
-                key={c.id}
-                style={styles.tableRow}
-                onClick={() => setSelected(selected?.id === c.id ? null : c)}
-              >
-                <div>
-                  <div style={styles.name}>{c.nombre || 'Sin nombre'}</div>
-                  <div style={styles.phone}>{c.telefono}</div>
-                </div>
-                <div style={{ color: 'var(--muted)', fontSize: 13 }}>{c.ciudad || '—'}</div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={styles.docsProgress}>
-                    {DOCS.map(d => (
-                      <div
-                        key={d.key}
-                        title={d.label}
-                        style={{
-                          ...styles.docDot,
-                          background: candDocs[d.key] ? '#22c55e' : 'var(--border)',
-                        }}
-                      />
-                    ))}
+              <div key={c.id}>
+                <div style={{ ...s.row, ...(isOpen ? s.rowOpen : {}) }}
+                  onClick={() => setSelected(isOpen ? null : c)}>
+                  <div style={s.candidateCell}>
+                    <div style={s.avatar}>{(c.nombre || 'C').charAt(0).toUpperCase()}</div>
+                    <div>
+                      <div style={s.name}>{c.nombre || 'Sin nombre'}</div>
+                      <div style={s.phone}>{c.telefono}</div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                    {uploaded}/{DOCS.length}
+                  <div style={s.ciudad}>{c.ciudad || '—'}</div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={s.dots}>
+                      {DOCS.map(d => (
+                        <div key={d.key} style={{
+                          ...s.dot,
+                          background: candDocs[d.key] ? '#4ade80' : '#1e293b',
+                          boxShadow: candDocs[d.key] ? '0 0 6px rgba(74,222,128,0.4)' : 'none',
+                        }} title={d.label} />
+                      ))}
+                    </div>
+                    <div style={s.dotsLabel}>{uploaded}/{DOCS.length}</div>
                   </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <span style={{ ...s.badge, color: sc.color, background: sc.bg }}>{sc.label}</span>
+                  </div>
+                  <div style={s.chevron}>{isOpen ? '▲' : '▼'}</div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{
-                    ...styles.badge,
-                    background: (STATUS_COLOR[status] || '#6b6b80') + '18',
-                    color: STATUS_COLOR[status] || '#6b6b80',
-                  }}>
-                    {status}
-                  </span>
-                </div>
-                <div style={{ color: 'var(--muted)', fontSize: 18 }}>
-                  {selected?.id === c.id ? '▲' : '▼'}
-                </div>
+
+                {isOpen && (
+                  <div style={s.detail}>
+                    <div style={s.detailTop}>
+                      <div>
+                        <div style={s.name}>{c.nombre}</div>
+                        <div style={s.phone}>{c.telefono} · {c.ciudad}</div>
+                      </div>
+                      <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>
+                        Ver formulario ↗
+                      </a>
+                    </div>
+                    <div style={s.docsList}>
+                      {DOCS.map(doc => {
+                        const url = candDocs[doc.key]
+                        return (
+                          <div key={doc.key} style={{ ...s.docItem, ...(url ? s.docDone : {}) }}>
+                            <span style={{ fontSize: 16 }}>{doc.icon}</span>
+                            <span style={{ flex: 1, fontSize: 13, color: url ? '#e2e8f0' : '#64748b' }}>{doc.label}</span>
+                            {url
+                              ? <a href={url} target="_blank" rel="noreferrer" style={s.docLink}>Ver ↗</a>
+                              : <span style={{ fontSize: 12, color: '#334155' }}>Pendiente</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
-      )}
-
-      {/* Detail panel */}
-      {selected && (
-        <div style={styles.detail}>
-          <div style={styles.detailHeader}>
-            <div>
-              <div style={styles.name}>{selected.nombre}</div>
-              <div style={styles.phone}>{selected.telefono} · {selected.ciudad}</div>
-            </div>
-            <a
-              href={`/upload?phone=${selected.telefono}`}
-              target="_blank"
-              rel="noreferrer"
-              style={styles.linkBtn}
-            >
-              Ver form candidato ↗
-            </a>
-          </div>
-          <div style={styles.docGrid}>
-            {DOCS.map(doc => {
-              const url = docs[selected.id]?.[doc.key]
-              return (
-                <div key={doc.key} style={{ ...styles.docItem, ...(url ? styles.docItemDone : {}) }}>
-                  <span style={{ fontSize: 20 }}>{doc.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.label}</div>
-                    {url ? (
-                      <a href={url} target="_blank" rel="noreferrer" style={styles.docLink}>
-                        Ver archivo ↗
-                      </a>
-                    ) : (
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pendiente</div>
-                    )}
-                  </div>
-                  <div style={{
-                    fontSize: 18,
-                    color: url ? 'var(--green)' : 'var(--border)',
-                  }}>
-                    {url ? '✓' : '○'}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
 
-const styles = {
-  page: {
-    maxWidth: 900, margin: '0 auto',
-    padding: '28px 20px 60px',
+const s = {
+  root: { minHeight: '100vh', background: '#070b14', position: 'relative', overflow: 'hidden' },
+  gridBg: {
+    position: 'fixed', inset: 0, zIndex: 0,
+    backgroundImage: `linear-gradient(rgba(30,58,138,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(30,58,138,0.06) 1px, transparent 1px)`,
+    backgroundSize: '40px 40px', pointerEvents: 'none',
   },
-  header: {
-    display: 'flex', justifyContent: 'space-between',
-    alignItems: 'flex-start', marginBottom: 28,
-    paddingBottom: 24, borderBottom: '1px solid var(--border)',
-  },
-  logo: {
-    fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800,
-    background: 'linear-gradient(135deg, var(--accent), var(--accent2))',
-    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-  },
-  sub: { color: 'var(--muted)', fontSize: 13, marginTop: 4 },
-  refreshBtn: {
-    background: 'var(--surface)', border: '1px solid var(--border)',
-    color: 'var(--text)', padding: '8px 16px', borderRadius: 8,
-    fontSize: 13, fontWeight: 500,
-  },
-  statsRow: {
-    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: 12, marginBottom: 20,
-  },
-  statCard: {
-    background: 'var(--surface)', border: '1px solid',
-    borderRadius: 12, padding: '16px',
-    textAlign: 'center',
-  },
-  statNum: { fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800 },
-  statLabel: { color: 'var(--muted)', fontSize: 12, marginTop: 4 },
-  filters: { display: 'flex', gap: 8, marginBottom: 16 },
-  filterBtn: {
-    background: 'var(--surface)', border: '1px solid var(--border)',
-    color: 'var(--muted)', padding: '6px 14px', borderRadius: 8,
-    fontSize: 13,
-  },
-  filterActive: {
-    background: 'var(--accent)', borderColor: 'var(--accent)',
-    color: '#fff',
-  },
-  table: {
-    background: 'var(--surface)', borderRadius: 14,
-    border: '1px solid var(--border)', overflow: 'hidden',
-  },
-  tableHeader: {
-    display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 40px',
-    padding: '10px 20px',
-    borderBottom: '1px solid var(--border)',
-    color: 'var(--muted)', fontSize: 12, fontWeight: 600,
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  tableRow: {
-    display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 40px',
-    padding: '14px 20px', alignItems: 'center',
-    borderBottom: '1px solid var(--border)',
-    cursor: 'pointer', transition: 'background 0.15s',
-  },
-  name: { fontWeight: 600, fontSize: 14 },
-  phone: { color: 'var(--muted)', fontSize: 12, marginTop: 2 },
-  docsProgress: { display: 'flex', gap: 3, justifyContent: 'center' },
-  docDot: { width: 8, height: 8, borderRadius: '50%', transition: 'background 0.2s' },
-  badge: {
-    display: 'inline-block', padding: '3px 10px',
-    borderRadius: 99, fontSize: 12, fontWeight: 500,
-  },
-  detail: {
-    marginTop: 16, background: 'var(--surface)',
-    borderRadius: 14, border: '1px solid var(--border)',
-    padding: 20,
-  },
-  detailHeader: {
-    display: 'flex', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 16,
-    paddingBottom: 16, borderBottom: '1px solid var(--border)',
-  },
-  linkBtn: {
-    color: 'var(--accent)', fontSize: 13, fontWeight: 500,
-    textDecoration: 'none',
-    background: 'var(--accent)18', padding: '6px 12px',
-    borderRadius: 8,
-  },
-  docGrid: { display: 'flex', flexDirection: 'column', gap: 8 },
-  docItem: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '10px 14px', borderRadius: 10,
-    border: '1px solid var(--border)', background: 'var(--surface2)',
-  },
-  docItemDone: {
-    borderColor: '#22c55e44', background: '#22c55e08',
-  },
-  docLink: {
-    color: 'var(--accent)', fontSize: 12,
-    textDecoration: 'none', fontWeight: 500,
-  },
+  wrap: { position: 'relative', zIndex: 1, maxWidth: 960, margin: '0 auto', padding: '36px 24px 80px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 36, paddingBottom: 28, borderBottom: '1px solid rgba(30,58,138,0.25)' },
+  logo: { fontFamily: "'Outfit', sans-serif", fontSize: 22, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.5px' },
+  logoDot: { color: '#3b82f6' },
+  logoSub: { color: '#475569', fontSize: 12, marginTop: 4, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' },
+  refreshBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(30,58,138,0.15)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 },
+  statCard: { background: 'rgba(15,23,42,0.8)', border: '1px solid', borderRadius: 12, padding: '20px 18px', backdropFilter: 'blur(10px)' },
+  statNum: { fontFamily: "'Outfit', sans-serif", fontSize: 36, fontWeight: 700, lineHeight: 1, marginBottom: 6 },
+  statLabel: { color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 12 },
+  statBar: { height: 3, borderRadius: 99, overflow: 'hidden' },
+  statBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.6s ease' },
+  filterRow: { display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' },
+  filterBtn: { background: 'transparent', border: '1px solid rgba(30,58,138,0.2)', color: '#475569', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontFamily: "'Outfit', sans-serif", cursor: 'pointer', letterSpacing: '0.03em' },
+  filterActive: { background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.4)', color: '#93c5fd' },
+  filterCount: { marginLeft: 'auto', color: '#334155', fontSize: 12, fontFamily: "'Outfit', sans-serif" },
+  table: { background: 'rgba(10,16,30,0.7)', border: '1px solid rgba(30,58,138,0.2)', borderRadius: 14, overflow: 'hidden', backdropFilter: 'blur(20px)' },
+  tableHead: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '10px 20px', borderBottom: '1px solid rgba(30,58,138,0.15)', color: '#334155', fontSize: 11, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase' },
+  row: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '14px 20px', alignItems: 'center', borderBottom: '1px solid rgba(15,23,42,0.6)', cursor: 'pointer', transition: 'background 0.15s' },
+  rowOpen: { background: 'rgba(30,58,138,0.06)', borderBottom: '1px solid rgba(30,58,138,0.15)' },
+  candidateCell: { display: 'flex', alignItems: 'center', gap: 12 },
+  avatar: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Outfit', sans-serif", flexShrink: 0 },
+  name: { color: '#e2e8f0', fontSize: 13, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
+  phone: { color: '#475569', fontSize: 11, marginTop: 2, fontFamily: "'Outfit', sans-serif" },
+  ciudad: { color: '#64748b', fontSize: 12, fontFamily: "'Outfit', sans-serif" },
+  dots: { display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 4 },
+  dot: { width: 7, height: 7, borderRadius: '50%', transition: 'all 0.2s' },
+  dotsLabel: { color: '#334155', fontSize: 10, fontFamily: "'Outfit', sans-serif" },
+  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' },
+  chevron: { color: '#334155', fontSize: 10, textAlign: 'right' },
+  empty: { padding: '48px', textAlign: 'center', display: 'flex', justifyContent: 'center' },
+  pulse: { width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
+  detail: { background: 'rgba(7,11,20,0.8)', borderTop: '1px solid rgba(30,58,138,0.15)', padding: '16px 20px', borderBottom: '1px solid rgba(30,58,138,0.1)' },
+  detailTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(30,58,138,0.1)' },
+  viewLink: { color: '#60a5fa', fontSize: 12, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', padding: '5px 12px', borderRadius: 6 },
+  docsList: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
+  docItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(30,58,138,0.1)', background: 'rgba(15,23,42,0.5)' },
+  docDone: { borderColor: 'rgba(74,222,128,0.15)', background: 'rgba(74,222,128,0.04)' },
+  docLink: { color: '#4ade80', fontSize: 11, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", flexShrink: 0 },
 }
+
+const style = document.createElement('style')
+style.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+  @keyframes spin { to { transform: rotate(360deg) } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+`
+document.head.appendChild(style)
