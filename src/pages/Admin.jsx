@@ -3,11 +3,14 @@ import { supabase } from '../lib/supabase'
 
 const DOCS = [
   { key: 'solicitud', label: 'Solicitud', icon: '📋' },
-  { key: 'ine', label: 'INE', icon: '🪪' },
+  { key: 'ine_frente', label: 'INE Frente', icon: '🪪' },
+  { key: 'ine_reverso', label: 'INE Reverso', icon: '🪪' },
   { key: 'curp', label: 'CURP', icon: '📄' },
   { key: 'fiscal', label: 'Fiscal', icon: '💼' },
   { key: 'domicilio', label: 'Domicilio', icon: '🏠' },
-  { key: 'licencia', label: 'Licencia', icon: '🚗' },
+  { key: 'licencia_frente', label: 'Licencia Frente', icon: '🚗' },
+  { key: 'licencia_reverso', label: 'Licencia Reverso', icon: '🚗' },
+  { key: 'toxico', label: 'Toxicológico', icon: '🧪' },
 ]
 
 const WEBHOOK_URL = 'https://b2blatam.app.n8n.cloud/webhook/3f449a7c-d11c-49b6-a67a-b363db0aa698'
@@ -113,7 +116,7 @@ export default function Admin() {
         <div style={s.table}>
           <div style={s.tableHead}>
             <span>Candidato</span><span>Ciudad</span>
-            <span style={{ textAlign: 'center' }}>Documentos</span>
+            <span style={{ textAlign: 'center' }}>Docs</span>
             <span style={{ textAlign: 'center' }}>Estado</span>
             <span></span>
           </div>
@@ -142,12 +145,10 @@ export default function Admin() {
                   </div>
                   <div style={s.ciudad}>{c.ciudad || '—'}</div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={s.dots}>
-                      {DOCS.map(d => (
-                        <div key={d.key} style={{ ...s.dot, background: candDocs[d.key] ? '#4ade80' : '#1e293b', boxShadow: candDocs[d.key] ? '0 0 6px rgba(74,222,128,0.4)' : 'none' }} title={d.label} />
-                      ))}
-                    </div>
                     <div style={s.dotsLabel}>{uploaded}/{DOCS.length}</div>
+                    <div style={{ ...s.progressMini }}>
+                      <div style={{ ...s.progressMiniFill, width: `${(uploaded/DOCS.length)*100}%` }} />
+                    </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <span style={{ ...s.badge, color: sc.color, background: sc.bg }}>{sc.label}</span>
@@ -162,17 +163,15 @@ export default function Admin() {
                         <div style={s.name}>{c.nombre}</div>
                         <div style={s.phone}>{c.telefono} · {c.ciudad}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button
                           onClick={(e) => { e.stopPropagation(); enviarFormulario(c) }}
                           disabled={isSending || wasSent}
                           style={{ ...s.waBtn, ...(wasSent ? s.waBtnSent : {}) }}
                         >
-                          {isSending ? '⏳ Enviando...' : wasSent ? '✓ Enviado' : '📲 Enviar formulario por WhatsApp'}
+                          {isSending ? '⏳ Enviando...' : wasSent ? '✓ Enviado' : '📲 Enviar formulario'}
                         </button>
-                        <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>
-                          Ver form ↗
-                        </a>
+                        <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>Ver form ↗</a>
                       </div>
                     </div>
                     <div style={s.docsList}>
@@ -180,10 +179,11 @@ export default function Admin() {
                         const url = candDocs[doc.key]
                         return (
                           <div key={doc.key} style={{ ...s.docItem, ...(url ? s.docDone : {}) }}>
-                            <span style={{ fontSize: 16 }}>{doc.icon}</span>
-                            <span style={{ flex: 1, fontSize: 13, color: url ? '#e2e8f0' : '#64748b' }}>{doc.label}</span>
-                            {url ? <a href={url} target="_blank" rel="noreferrer" style={s.docLink}>Ver ↗</a>
-                                 : <span style={{ fontSize: 12, color: '#334155' }}>Pendiente</span>}
+                            <span style={{ fontSize: 14 }}>{doc.icon}</span>
+                            <span style={{ flex: 1, fontSize: 12, color: url ? '#e2e8f0' : '#64748b' }}>{doc.label}</span>
+                            {url
+                              ? <a href={url} target="_blank" rel="noreferrer" style={s.docLink}>Ver ↗</a>
+                              : <span style={{ fontSize: 11, color: '#334155' }}>Pendiente</span>}
                           </div>
                         )
                       })}
@@ -227,9 +227,9 @@ const s = {
   name: { color: '#e2e8f0', fontSize: 13, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
   phone: { color: '#475569', fontSize: 11, marginTop: 2, fontFamily: "'Outfit', sans-serif" },
   ciudad: { color: '#64748b', fontSize: 12, fontFamily: "'Outfit', sans-serif" },
-  dots: { display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 4 },
-  dot: { width: 7, height: 7, borderRadius: '50%', transition: 'all 0.2s' },
-  dotsLabel: { color: '#334155', fontSize: 10, fontFamily: "'Outfit', sans-serif" },
+  progressMini: { height: 3, background: 'rgba(30,58,138,0.2)', borderRadius: 99, overflow: 'hidden', marginTop: 4, width: 60, margin: '4px auto 0' },
+  progressMiniFill: { height: '100%', background: '#3b82f6', borderRadius: 99 },
+  dotsLabel: { color: '#64748b', fontSize: 11, fontFamily: "'Outfit', sans-serif" },
   badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' },
   chevron: { color: '#334155', fontSize: 10, textAlign: 'right' },
   empty: { padding: '48px', textAlign: 'center', display: 'flex', justifyContent: 'center' },
@@ -240,7 +240,7 @@ const s = {
   waBtnSent: { background: 'rgba(74,222,128,0.08)', borderColor: 'rgba(74,222,128,0.2)', color: '#4ade80', cursor: 'default' },
   viewLink: { color: '#60a5fa', fontSize: 12, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', padding: '5px 12px', borderRadius: 6, whiteSpace: 'nowrap' },
   docsList: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
-  docItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(30,58,138,0.1)', background: 'rgba(15,23,42,0.5)' },
+  docItem: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(30,58,138,0.1)', background: 'rgba(15,23,42,0.5)' },
   docDone: { borderColor: 'rgba(74,222,128,0.15)', background: 'rgba(74,222,128,0.04)' },
   docLink: { color: '#4ade80', fontSize: 11, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", flexShrink: 0 },
 }
