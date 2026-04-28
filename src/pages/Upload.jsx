@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const DOCS = [
-  { key: 'solicitud', label: 'Solicitud de empleo', desc: '3 referencias laborales', icon: '📋' },
-  { key: 'ine', label: 'INE', desc: 'Ambos lados', icon: '🪪' },
-  { key: 'curp', label: 'CURP', desc: 'Revisión de antecedentes', icon: '📄' },
-  { key: 'fiscal', label: 'Constancia fiscal', desc: 'Seguro social e Infonavit si aplica', icon: '💼' },
-  { key: 'domicilio', label: 'Comprobante de domicilio', desc: 'No mayor a 3 meses', icon: '🏠' },
-  { key: 'licencia', label: 'Licencia vigente', desc: 'Ambos lados', icon: '🚗' },
+  { key: 'solicitud', label: 'Solicitud de empleo', desc: '3 referencias laborales', icon: '📋', sides: 1 },
+  { key: 'ine', label: 'INE', desc: 'Frente y reverso', icon: '🪪', sides: 2 },
+  { key: 'curp', label: 'CURP', desc: 'Revisión de antecedentes', icon: '📄', sides: 1 },
+  { key: 'fiscal', label: 'Constancia fiscal', desc: 'Seguro social e Infonavit si aplica', icon: '💼', sides: 1 },
+  { key: 'domicilio', label: 'Comprobante de domicilio', desc: 'No mayor a 3 meses', icon: '🏠', sides: 1 },
+  { key: 'licencia', label: 'Licencia vigente', desc: 'Frente y reverso', icon: '🚗', sides: 2 },
+  { key: 'toxico', label: 'Examen toxicológico', desc: 'Resultado del examen', icon: '🧪', sides: 1 },
 ]
 
 export default function Upload() {
@@ -43,30 +44,29 @@ export default function Upload() {
     const newDone = { ...done, [docKey]: urlData.publicUrl }
     setDone(newDone)
     setUploading(p => ({ ...p, [docKey]: false }))
-    const allUploaded = DOCS.every(d => newDone[d.key])
+    const allUploaded = DOCS.every(d => {
+      if (d.sides === 2) return newDone[d.key + '_frente'] && newDone[d.key + '_reverso']
+      return newDone[d.key]
+    })
     await supabase.from('candidatos').update({ form_status: allUploaded ? 'completado' : 'parcial' }).eq('id', candidato.id)
   }
 
-  const totalDone = DOCS.filter(d => done[d.key]).length
-  const allDone = totalDone === DOCS.length
-  const pct = Math.round((totalDone / DOCS.length) * 100)
+  const totalDone = DOCS.reduce((acc, d) => {
+    if (d.sides === 2) return acc + (done[d.key + '_frente'] ? 0.5 : 0) + (done[d.key + '_reverso'] ? 0.5 : 0)
+    return acc + (done[d.key] ? 1 : 0)
+  }, 0)
+  const totalItems = DOCS.length
+  const allDone = totalDone === totalItems
+  const pct = Math.round((totalDone / totalItems) * 100)
 
-  if (loading) return (
-    <div style={{ ...s.center, minHeight: '100vh', background: '#070b14' }}>
-      <div style={s.spinner} />
-    </div>
-  )
+  if (loading) return <div style={{ ...s.center, minHeight: '100vh', background: '#070b14' }}><div style={s.spinner} /></div>
 
   if (!phone || error) return (
     <div style={{ ...s.center, minHeight: '100vh', background: '#070b14' }}>
       <div style={s.errorBox}>
         <div style={{ fontSize: 40, marginBottom: 16 }}>🔗</div>
-        <p style={{ color: '#e2e8f0', fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 500 }}>
-          {error || 'Link inválido'}
-        </p>
-        <p style={{ color: '#475569', fontSize: 13, marginTop: 8, fontFamily: "'Outfit', sans-serif" }}>
-          Usa el link enviado por tu reclutador
-        </p>
+        <p style={{ color: '#e2e8f0', fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 500 }}>{error || 'Link inválido'}</p>
+        <p style={{ color: '#475569', fontSize: 13, marginTop: 8, fontFamily: "'Outfit', sans-serif" }}>Usa el link enviado por tu reclutador</p>
       </div>
     </div>
   )
@@ -87,24 +87,53 @@ export default function Upload() {
               <div style={s.progressSub}>Sube todos para completar tu registro</div>
             </div>
             <div style={s.progressNum}>
-              <span style={{ color: allDone ? '#4ade80' : '#60a5fa', fontSize: 28, fontWeight: 700 }}>{totalDone}</span>
-              <span style={{ color: '#334155', fontSize: 18 }}>/{DOCS.length}</span>
+              <span style={{ color: allDone ? '#4ade80' : '#60a5fa', fontSize: 28, fontWeight: 700 }}>{Math.round(totalDone)}</span>
+              <span style={{ color: '#334155', fontSize: 18 }}>/{totalItems}</span>
             </div>
           </div>
           <div style={s.barWrap}>
             <div style={{ ...s.barFill, width: `${pct}%`, background: allDone ? '#4ade80' : '#3b82f6' }} />
           </div>
-          {allDone && (
-            <div style={s.successMsg}>
-              🎉 ¡Todos tus documentos fueron recibidos! Te contactaremos pronto.
-            </div>
-          )}
+          {allDone && <div style={s.successMsg}>🎉 ¡Todos tus documentos fueron recibidos! Te contactaremos pronto.</div>}
         </div>
 
         <div style={s.docsList}>
           {DOCS.map(doc => {
+            if (doc.sides === 2) {
+              const keyF = doc.key + '_frente'
+              const keyR = doc.key + '_reverso'
+              const doneF = !!done[keyF]
+              const doneR = !!done[keyR]
+              const bothDone = doneF && doneR
+              return (
+                <div key={doc.key} style={{ ...s.docCard, ...(bothDone ? s.docCardDone : {}) }}>
+                  <div style={s.docLeft}>
+                    <span style={{ fontSize: 20 }}>{doc.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ ...s.docLabel, color: bothDone ? '#e2e8f0' : '#94a3b8' }}>{doc.label}</div>
+                      <div style={s.docDesc}>{doc.desc}</div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        {[{ key: keyF, label: 'Frente' }, { key: keyR, label: 'Reverso' }].map(side => (
+                          <div key={side.key}>
+                            {done[side.key] ? (
+                              <span style={s.checkBadgeSm}>✓ {side.label}</span>
+                            ) : (
+                              <label style={s.uploadBtnSm}>
+                                {uploading[side.key] ? <span style={s.spinnerSm} /> : `↑ ${side.label}`}
+                                <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+                                  onChange={e => handleUpload(side.key, e.target.files[0])} disabled={uploading[side.key]} />
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
             const isDone = !!done[doc.key]
-            const isUp = uploading[doc.key]
             return (
               <div key={doc.key} style={{ ...s.docCard, ...(isDone ? s.docCardDone : {}) }}>
                 <div style={s.docLeft}>
@@ -119,9 +148,9 @@ export default function Upload() {
                     <span style={s.checkBadge}>✓ Listo</span>
                   ) : (
                     <label style={s.uploadBtn}>
-                      {isUp ? <span style={s.spinnerSm} /> : '↑ Subir'}
+                      {uploading[doc.key] ? <span style={s.spinnerSm} /> : '↑ Subir'}
                       <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
-                        onChange={e => handleUpload(doc.key, e.target.files[0])} disabled={isUp} />
+                        onChange={e => handleUpload(doc.key, e.target.files[0])} disabled={uploading[doc.key]} />
                     </label>
                   )}
                 </div>
@@ -129,7 +158,6 @@ export default function Upload() {
             )
           })}
         </div>
-
         <div style={s.footer}>{candidato?.telefono} · B2B Latam</div>
       </div>
     </div>
@@ -138,11 +166,7 @@ export default function Upload() {
 
 const s = {
   root: { minHeight: '100vh', background: '#070b14', position: 'relative' },
-  gridBg: {
-    position: 'fixed', inset: 0, zIndex: 0,
-    backgroundImage: `linear-gradient(rgba(30,58,138,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(30,58,138,0.05) 1px, transparent 1px)`,
-    backgroundSize: '40px 40px', pointerEvents: 'none',
-  },
+  gridBg: { position: 'fixed', inset: 0, zIndex: 0, backgroundImage: `linear-gradient(rgba(30,58,138,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(30,58,138,0.05) 1px, transparent 1px)`, backgroundSize: '40px 40px', pointerEvents: 'none' },
   wrap: { position: 'relative', zIndex: 1, maxWidth: 520, margin: '0 auto', padding: '32px 20px 60px' },
   center: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
   errorBox: { textAlign: 'center', padding: '40px 32px', background: 'rgba(10,16,30,0.8)', borderRadius: 16, border: '1px solid rgba(30,58,138,0.2)' },
@@ -160,13 +184,15 @@ const s = {
   docsList: { display: 'flex', flexDirection: 'column', gap: 8 },
   docCard: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', background: 'rgba(10,16,30,0.7)', border: '1px solid rgba(30,58,138,0.12)', borderRadius: 12, backdropFilter: 'blur(10px)' },
   docCardDone: { borderColor: 'rgba(74,222,128,0.15)', background: 'rgba(74,222,128,0.03)' },
-  docLeft: { display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 },
+  docLeft: { display: 'flex', alignItems: 'flex-start', gap: 12, flex: 1, minWidth: 0 },
   docLabel: { fontSize: 13, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
   docDesc: { color: '#334155', fontSize: 11, marginTop: 2, fontFamily: "'Outfit', sans-serif" },
-  checkBadge: { color: '#4ade80', fontSize: 12, fontWeight: 500, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)', padding: '4px 10px', borderRadius: 20, fontFamily: "'Outfit', sans-serif" },
+  checkBadge: { color: '#4ade80', fontSize: 12, fontWeight: 500, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)', padding: '4px 10px', borderRadius: 20, fontFamily: "'Outfit', sans-serif", whiteSpace: 'nowrap' },
+  checkBadgeSm: { color: '#4ade80', fontSize: 11, fontWeight: 500, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)', padding: '3px 8px', borderRadius: 20, fontFamily: "'Outfit', sans-serif", display: 'inline-block' },
   uploadBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', minWidth: 72, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
+  uploadBtnSm: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
   spinner: { width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.2)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
-  spinnerSm: { width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(96,165,250,0.3)', borderTopColor: '#60a5fa', animation: 'spin 0.8s linear infinite', display: 'inline-block' },
+  spinnerSm: { width: 10, height: 10, borderRadius: '50%', border: '2px solid rgba(96,165,250,0.3)', borderTopColor: '#60a5fa', animation: 'spin 0.8s linear infinite', display: 'inline-block' },
   footer: { textAlign: 'center', color: '#1e293b', fontSize: 11, marginTop: 36, fontFamily: "'Outfit', sans-serif" },
 }
 
