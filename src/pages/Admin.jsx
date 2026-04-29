@@ -3,14 +3,23 @@ import { supabase } from '../lib/supabase'
 
 const DOCS = [
   { key: 'solicitud', label: 'Solicitud', icon: '📋' },
+  { key: 'identificacion', label: 'Identificación oficial', icon: '🪪' },
   { key: 'ine_frente', label: 'INE Frente', icon: '🪪' },
   { key: 'ine_reverso', label: 'INE Reverso', icon: '🪪' },
-  { key: 'curp', label: 'CURP', icon: '📄' },
-  { key: 'fiscal', label: 'Fiscal', icon: '💼' },
-  { key: 'domicilio', label: 'Domicilio', icon: '🏠' },
+  { key: 'licencia', label: 'Licencia', icon: '🚗' },
   { key: 'licencia_frente', label: 'Licencia Frente', icon: '🚗' },
   { key: 'licencia_reverso', label: 'Licencia Reverso', icon: '🚗' },
-  { key: 'toxico', label: 'Toxicológico', icon: '🧪' },
+  { key: 'domicilio', label: 'Domicilio', icon: '🏠' },
+  { key: 'nss', label: 'Seguro Social', icon: '🏥' },
+  { key: 'curp', label: 'CURP', icon: '📄' },
+  { key: 'fiscal', label: 'Fiscal', icon: '💼' },
+  { key: 'infonavit', label: 'INFONAVIT', icon: '🏗️' },
+]
+
+const REFS = [
+  { key: 'ref1', label: 'Referencia laboral 1' },
+  { key: 'ref2', label: 'Referencia laboral 2' },
+  { key: 'ref3', label: 'Referencia personal' },
 ]
 
 const WEBHOOK_URL = 'https://b2blatam.app.n8n.cloud/webhook/3f449a7c-d11c-49b6-a67a-b363db0aa698'
@@ -175,6 +184,7 @@ export default function Admin() {
                         <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>Ver form ↗</a>
                       </div>
                     </div>
+
                     <div style={s.docsList}>
                       {DOCS.map(doc => {
                         const url = candDocs[doc.key]
@@ -189,6 +199,25 @@ export default function Admin() {
                         )
                       })}
                     </div>
+
+                    {REFS.some(r => candDocs[r.key]) && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 8 }}>Referencias</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {REFS.map(ref => {
+                            const val = candDocs[ref.key]
+                            if (!val) return null
+                            return (
+                              <div key={ref.key} style={{ ...s.docItem, ...s.docDone }}>
+                                <span style={{ fontSize: 14 }}>👤</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 120, fontFamily: "'Outfit', sans-serif" }}>{ref.label}:</span>
+                                <span style={{ fontSize: 12, color: '#e2e8f0', fontFamily: "'Outfit', sans-serif" }}>{val}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
