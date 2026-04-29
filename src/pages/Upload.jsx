@@ -48,7 +48,11 @@ export default function Upload() {
       if (d.sides === 2) return newDone[d.key + '_frente'] && newDone[d.key + '_reverso']
       return newDone[d.key]
     })
-    await supabase.from('candidatos').update({ form_status: allUploaded ? 'completado' : 'parcial' }).eq('id', candidato.id)
+    const { error: updateErr } = await supabase
+      .from('candidatos')
+      .update({ form_status: allUploaded ? 'completado' : 'parcial' })
+      .eq('id', candidato.id)
+    if (updateErr) console.error('STATUS UPDATE FAILED:', updateErr)
   }
 
   const totalDone = DOCS.reduce((acc, d) => {
