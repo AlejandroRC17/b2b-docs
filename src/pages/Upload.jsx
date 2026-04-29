@@ -3,14 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const DOCS = [
-  { key: 'solicitud', label: 'Solicitud de empleo', desc: 'Formato firmado', icon: '📋', sides: 1 },
-  { key: 'identificacion', label: 'Identificación oficial', desc: 'INE o pasaporte', icon: '🪪', sides: 1 },
-  { key: 'licencia', label: 'Licencia de conducir vigente', desc: 'Ambos lados en un archivo', icon: '🚗', sides: 1 },
-  { key: 'domicilio', label: 'Comprobante de domicilio', desc: 'No mayor a 3 meses', icon: '🏠', sides: 1 },
-  { key: 'nss', label: 'Número de Seguro Social', desc: 'Hoja del IMSS', icon: '🏥', sides: 1 },
-  { key: 'curp', label: 'CURP', desc: 'Revisión de antecedentes', icon: '📄', sides: 1 },
-  { key: 'fiscal', label: 'Constancia de Situación Fiscal', desc: 'SAT actualizada', icon: '💼', sides: 1 },
-  { key: 'infonavit', label: 'Hoja de retención de INFONAVIT', desc: 'Si aplica', icon: '🏗️', sides: 1 },
+  { key: 'solicitud', label: 'Solicitud de empleo', desc: 'Formato firmado', icon: '📋', type: 'file', required: true },
+  { key: 'ine', label: 'Identificación oficial (INE)', desc: 'Frente y reverso', icon: '🪪', type: 'double', required: true },
+  { key: 'licencia', label: 'Licencia de conducir vigente', desc: 'Frente y reverso', icon: '🚗', type: 'double', required: true },
+  { key: 'domicilio', label: 'Comprobante de domicilio', desc: 'No mayor a 3 meses', icon: '🏠', type: 'file', required: true },
+  { key: 'nss', label: 'Número de Seguro Social', desc: 'Hoja del IMSS', icon: '🏥', type: 'file', required: true },
+  { key: 'curp', label: 'CURP', desc: 'Revisión de antecedentes', icon: '📄', type: 'file', required: true },
+  { key: 'fiscal', label: 'Constancia de Situación Fiscal', desc: 'SAT actualizada', icon: '💼', type: 'file', required: true },
+  { key: 'infonavit', label: 'Hoja de retención de INFONAVIT', desc: 'Si aplica (opcional)', icon: '🏗️', type: 'file', required: false },
 ]
 
 const REFS = [
@@ -76,7 +76,11 @@ export default function Upload() {
   }
 
   async function checkAndUpdateStatus(currentDone, currentTexts) {
-    const allFilesUploaded = DOCS.every(d => currentDone[d.key])
+    const allFilesUploaded = DOCS.every(d => {
+      if (!d.required) return true
+      if (d.type === 'double') return currentDone[d.key + '_frente'] && currentDone[d.key + '_reverso']
+      return currentDone[d.key]
+    })
     const allRefsFilled = REFS.every(r => currentTexts[r.key]?.trim())
     const allUploaded = allFilesUploaded && allRefsFilled
     const { error: updateErr } = await supabase
@@ -86,11 +90,26 @@ export default function Upload() {
     if (updateErr) console.error('STATUS UPDATE FAILED:', updateErr)
   }
 
-  const fileDone = DOCS.filter(d => done[d.key]).length
-  const refDone = REFS.filter(r => texts[r.key]?.trim()).length
-  const totalDone = fileDone + refDone
+  const countDone = () => {
+    let count = 0
+    DOCS.forEach(d => {
+      if (d.type === 'double') {
+        if (done[d.key + '_frente']) count += 0.5
+        if (done[d.key + '_reverso']) count += 0.5
+      } else {
+        if (done[d.key]) count += 1
+      }
+    })
+    return count
+  }
+
+  const totalDone = countDone() + REFS.filter(r => texts[r.key]?.trim()).length
   const totalItems = DOCS.length + REFS.length
-  const allDone = totalDone === totalItems
+  const allDone = DOCS.every(d => {
+    if (!d.required) return true
+    if (d.type === 'double') return done[d.key + '_frente'] && done[d.key + '_reverso']
+    return done[d.key]
+  }) && REFS.every(r => texts[r.key]?.trim())
   const pct = Math.round((totalDone / totalItems) * 100)
 
   if (loading) return <div style={{ ...s.center, minHeight: '100vh', background: '#070b14' }}><div style={s.spinner} /></div>
@@ -121,7 +140,7 @@ export default function Upload() {
               <div style={s.progressSub}>Sube todos para completar tu registro</div>
             </div>
             <div style={s.progressNum}>
-              <span style={{ color: allDone ? '#4ade80' : '#60a5fa', fontSize: 28, fontWeight: 700 }}>{totalDone}</span>
+              <span style={{ color: allDone ? '#4ade80' : '#60a5fa', fontSize: 28, fontWeight: 700 }}>{Math.round(totalDone)}</span>
               <span style={{ color: '#334155', fontSize: 18 }}>/{totalItems}</span>
             </div>
           </div>
@@ -133,13 +152,50 @@ export default function Upload() {
 
         <div style={s.docsList}>
           {DOCS.map(doc => {
+            if (doc.type === 'double') {
+              const keyF = doc.key + '_frente'
+              const keyR = doc.key + '_reverso'
+              const doneF = !!done[keyF]
+              const doneR = !!done[keyR]
+              const bothDone = doneF && doneR
+              return (
+                <div key={doc.key} style={{ ...s.docCard, ...(bothDone ? s.docCardDone : {}) }}>
+                  <div style={s.docLeft}>
+                    <span style={{ fontSize: 20 }}>{doc.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ ...s.docLabel, color: bothDone ? '#e2e8f0' : '#94a3b8' }}>{doc.label}</div>
+                      <div style={s.docDesc}>{doc.desc}</div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        {[{ key: keyF, label: 'Frente' }, { key: keyR, label: 'Reverso' }].map(side => (
+                          <div key={side.key}>
+                            {done[side.key] ? (
+                              <span style={s.checkBadgeSm}>✓ {side.label}</span>
+                            ) : (
+                              <label style={s.uploadBtnSm}>
+                                {uploading[side.key] ? <span style={s.spinnerSm} /> : `↑ ${side.label}`}
+                                <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+                                  onChange={e => handleUpload(side.key, e.target.files[0])} disabled={uploading[side.key]} />
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
             const isDone = !!done[doc.key]
             return (
               <div key={doc.key} style={{ ...s.docCard, ...(isDone ? s.docCardDone : {}) }}>
                 <div style={s.docLeft}>
                   <span style={{ fontSize: 20 }}>{doc.icon}</span>
                   <div>
-                    <div style={{ ...s.docLabel, color: isDone ? '#e2e8f0' : '#94a3b8' }}>{doc.label}</div>
+                    <div style={{ ...s.docLabel, color: isDone ? '#e2e8f0' : '#94a3b8' }}>
+                      {doc.label}
+                      {!doc.required && <span style={{ color: '#475569', fontSize: 10, marginLeft: 6 }}>(opcional)</span>}
+                    </div>
                     <div style={s.docDesc}>{doc.desc}</div>
                   </div>
                 </div>
@@ -216,6 +272,7 @@ const s = {
   checkBadge: { color: '#4ade80', fontSize: 12, fontWeight: 500, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)', padding: '4px 10px', borderRadius: 20, fontFamily: "'Outfit', sans-serif", whiteSpace: 'nowrap' },
   checkBadgeSm: { color: '#4ade80', fontSize: 11, fontWeight: 500, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)', padding: '3px 8px', borderRadius: 20, fontFamily: "'Outfit', sans-serif", display: 'inline-block' },
   uploadBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', minWidth: 72, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
+  uploadBtnSm: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
   textInput: { flex: 1, background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(30,58,138,0.3)', borderRadius: 8, padding: '7px 12px', color: '#e2e8f0', fontSize: 12, fontFamily: "'Outfit', sans-serif", outline: 'none' },
   spinner: { width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.2)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
   spinnerSm: { width: 10, height: 10, borderRadius: '50%', border: '2px solid rgba(96,165,250,0.3)', borderTopColor: '#60a5fa', animation: 'spin 0.8s linear infinite', display: 'inline-block' },
