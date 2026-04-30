@@ -25,12 +25,139 @@ const REFS = [
 const WEBHOOK_URL = 'https://b2blatam.app.n8n.cloud/webhook/3f449a7c-d11c-49b6-a67a-b363db0aa698'
 const APP_URL = 'https://b2b-docs-chi.vercel.app'
 
+const statusConfig = {
+  completado: { color: '#4ade80', bg: 'rgba(74,222,128,0.08)', label: 'Completo' },
+  parcial:    { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', label: 'Parcial' },
+  pendiente:  { color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', label: 'Pendiente' },
+}
+
+function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFormulario }) {
+  const candDocs = docs[c.id] || {}
+  const uploaded = DOCS.filter(d => candDocs[d.key]).length
+  const status = c.form_status || 'pendiente'
+  const sc = statusConfig[status] || statusConfig.pendiente
+  const isOpen = selected?.id === c.id
+  const isSending = sending[c.id]
+  const wasSent = sent[c.id]
+
+  return (
+    <div key={c.id}>
+      <div style={{ ...s.row, ...(isOpen ? s.rowOpen : {}) }} onClick={() => setSelected(isOpen ? null : c)}>
+        <div style={s.candidateCell}>
+          <div style={s.avatar}>{(c.nombre || 'C').charAt(0).toUpperCase()}</div>
+          <div>
+            <div style={s.name}>{c.nombre || 'Sin nombre'}</div>
+            <div style={s.phone}>{c.telefono}</div>
+          </div>
+        </div>
+        <div style={s.ciudad}>{c.ciudad || '—'}</div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={s.dotsLabel}>{uploaded}/{DOCS.length}</div>
+          <div style={s.progressMini}>
+            <div style={{ ...s.progressMiniFill, width: `${(uploaded / DOCS.length) * 100}%` }} />
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <span style={{ ...s.badge, color: sc.color, background: sc.bg }}>{sc.label}</span>
+        </div>
+        <div style={s.chevron}>{isOpen ? '▲' : '▼'}</div>
+      </div>
+
+      {isOpen && (
+        <div style={s.detail}>
+          <div style={s.detailTop}>
+            <div>
+              <div style={s.name}>{c.nombre}</div>
+              <div style={s.phone}>{c.telefono} · {c.ciudad}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); enviarFormulario(c) }}
+                disabled={isSending || wasSent}
+                style={{ ...s.waBtn, ...(wasSent ? s.waBtnSent : {}) }}
+              >
+                {isSending ? '⏳ Enviando...' : wasSent ? '✓ Enviado' : '📲 Enviar formulario'}
+              </button>
+              <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>Ver form ↗</a>
+            </div>
+          </div>
+          <div style={s.docsList}>
+            {DOCS.map(doc => {
+              const url = candDocs[doc.key]
+              return (
+                <div key={doc.key} style={{ ...s.docItem, ...(url ? s.docDone : {}) }}>
+                  <span style={{ fontSize: 14 }}>{doc.icon}</span>
+                  <span style={{ flex: 1, fontSize: 12, color: url ? '#e2e8f0' : '#64748b' }}>{doc.label}</span>
+                  {url
+                    ? <a href={url} target="_blank" rel="noreferrer" style={s.docLink}>Ver ↗</a>
+                    : <span style={{ fontSize: 11, color: '#334155' }}>Pendiente</span>}
+                </div>
+              )
+            })}
+          </div>
+          {REFS.some(r => candDocs[r.key]) && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 8 }}>Referencias</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {REFS.map(ref => {
+                  const val = candDocs[ref.key]
+                  if (!val) return null
+                  return (
+                    <div key={ref.key} style={{ ...s.docItem, ...s.docDone }}>
+                      <span style={{ fontSize: 14 }}>👤</span>
+                      <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 120, fontFamily: "'Outfit', sans-serif" }}>{ref.label}:</span>
+                      <span style={{ fontSize: 12, color: '#e2e8f0', fontFamily: "'Outfit', sans-serif" }}>{val}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Section({ title, emoji, color, borderColor, candidatos, docs, sending, sent, selected, setSelected, enviarFormulario, emptyMsg }) {
+  const [collapsed, setCollapsed] = useState(false)
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, cursor: 'pointer' }}
+        onClick={() => setCollapsed(p => !p)}
+      >
+        <span style={{ fontSize: 18 }}>{emoji}</span>
+        <span style={{ color, fontSize: 14, fontWeight: 700, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' }}>{title}</span>
+        <span style={{ background: color + '22', color, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, fontFamily: "'Outfit', sans-serif" }}>{candidatos.length}</span>
+        <span style={{ marginLeft: 'auto', color: '#334155', fontSize: 11 }}>{collapsed ? '▼' : '▲'}</span>
+      </div>
+      {!collapsed && (
+        <div style={{ ...s.table, borderColor }}>
+          <div style={s.tableHead}>
+            <span>Candidato</span><span>Ciudad</span>
+            <span style={{ textAlign: 'center' }}>Docs</span>
+            <span style={{ textAlign: 'center' }}>Estado</span>
+            <span></span>
+          </div>
+          {candidatos.length === 0
+            ? <div style={s.empty}><span style={{ color: '#475569', fontSize: 13 }}>{emptyMsg}</span></div>
+            : candidatos.map(c => (
+              <CandidatoRow key={c.id} c={c} docs={docs} sending={sending} sent={sent}
+                selected={selected} setSelected={setSelected} enviarFormulario={enviarFormulario} />
+            ))
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Admin() {
   const [candidatos, setCandidatos] = useState([])
   const [docs, setDocs] = useState({})
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
-  const [filter, setFilter] = useState('todos')
   const [sending, setSending] = useState({})
   const [sent, setSent] = useState({})
 
@@ -72,18 +199,18 @@ export default function Admin() {
     setSending(p => ({ ...p, [c.id]: false }))
   }
 
-  const filtered = filter === 'todos' ? candidatos : candidatos.filter(c => c.form_status === filter)
+  const aprobados = candidatos.filter(c => c.chat_status === 'completado' || c.etapa === 'llamadas')
+  const rechazados = candidatos.filter(c => c.chat_status === 'rechazado')
+  const enProceso = candidatos.filter(c => c.chat_status !== 'completado' && c.etapa !== 'llamadas' && c.chat_status !== 'rechazado')
+
   const stats = {
     total: candidatos.length,
-    completado: candidatos.filter(c => c.form_status === 'completado').length,
-    parcial: candidatos.filter(c => c.form_status === 'parcial').length,
-    pendiente: candidatos.filter(c => !c.form_status || c.form_status === 'pendiente').length,
+    aprobados: aprobados.length,
+    rechazados: rechazados.length,
+    enProceso: enProceso.length,
   }
-  const statusConfig = {
-    completado: { color: '#4ade80', bg: 'rgba(74,222,128,0.08)', label: 'Completo' },
-    parcial:    { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', label: 'Parcial' },
-    pendiente:  { color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', label: 'Pendiente' },
-  }
+
+  const rowProps = { docs, sending, sent, selected, setSelected, enviarFormulario }
 
   return (
     <div style={s.root}>
@@ -100,9 +227,9 @@ export default function Admin() {
         <div style={s.statsGrid}>
           {[
             { label: 'Total', value: stats.total, accent: '#e2e8f0' },
-            { label: 'Completos', value: stats.completado, accent: '#4ade80' },
-            { label: 'Parciales', value: stats.parcial, accent: '#60a5fa' },
-            { label: 'Pendientes', value: stats.pendiente, accent: '#94a3b8' },
+            { label: 'Aprobados', value: stats.aprobados, accent: '#4ade80' },
+            { label: 'En proceso', value: stats.enProceso, accent: '#60a5fa' },
+            { label: 'Rechazados', value: stats.rechazados, accent: '#f87171' },
           ].map(s2 => (
             <div key={s2.label} style={{ ...s.statCard, borderColor: s2.accent + '22' }}>
               <div style={{ ...s.statNum, color: s2.accent }}>{s2.value}</div>
@@ -114,116 +241,26 @@ export default function Admin() {
           ))}
         </div>
 
-        <div style={s.filterRow}>
-          {['todos', 'completado', 'parcial', 'pendiente'].map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{ ...s.filterBtn, ...(filter === f ? s.filterActive : {}) }}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-          <span style={s.filterCount}>{filtered.length} candidatos</span>
-        </div>
-
-        <div style={s.table}>
-          <div style={s.tableHead}>
-            <span>Candidato</span><span>Ciudad</span>
-            <span style={{ textAlign: 'center' }}>Docs</span>
-            <span style={{ textAlign: 'center' }}>Estado</span>
-            <span></span>
-          </div>
-
-          {loading && <div style={s.empty}><div style={s.pulse} /></div>}
-          {!loading && filtered.length === 0 && <div style={s.empty}><span style={{ color: '#475569', fontSize: 13 }}>Sin candidatos</span></div>}
-
-          {!loading && filtered.map(c => {
-            const candDocs = docs[c.id] || {}
-            const uploaded = DOCS.filter(d => candDocs[d.key]).length
-            const status = c.form_status || 'pendiente'
-            const sc = statusConfig[status] || statusConfig.pendiente
-            const isOpen = selected?.id === c.id
-            const isSending = sending[c.id]
-            const wasSent = sent[c.id]
-
-            return (
-              <div key={c.id}>
-                <div style={{ ...s.row, ...(isOpen ? s.rowOpen : {}) }} onClick={() => setSelected(isOpen ? null : c)}>
-                  <div style={s.candidateCell}>
-                    <div style={s.avatar}>{(c.nombre || 'C').charAt(0).toUpperCase()}</div>
-                    <div>
-                      <div style={s.name}>{c.nombre || 'Sin nombre'}</div>
-                      <div style={s.phone}>{c.telefono}</div>
-                    </div>
-                  </div>
-                  <div style={s.ciudad}>{c.ciudad || '—'}</div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={s.dotsLabel}>{uploaded}/{DOCS.length}</div>
-                    <div style={{ ...s.progressMini }}>
-                      <div style={{ ...s.progressMiniFill, width: `${(uploaded/DOCS.length)*100}%` }} />
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ ...s.badge, color: sc.color, background: sc.bg }}>{sc.label}</span>
-                  </div>
-                  <div style={s.chevron}>{isOpen ? '▲' : '▼'}</div>
-                </div>
-
-                {isOpen && (
-                  <div style={s.detail}>
-                    <div style={s.detailTop}>
-                      <div>
-                        <div style={s.name}>{c.nombre}</div>
-                        <div style={s.phone}>{c.telefono} · {c.ciudad}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); enviarFormulario(c) }}
-                          disabled={isSending || wasSent}
-                          style={{ ...s.waBtn, ...(wasSent ? s.waBtnSent : {}) }}
-                        >
-                          {isSending ? '⏳ Enviando...' : wasSent ? '✓ Enviado' : '📲 Enviar formulario'}
-                        </button>
-                        <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>Ver form ↗</a>
-                      </div>
-                    </div>
-
-                    <div style={s.docsList}>
-                      {DOCS.map(doc => {
-                        const url = candDocs[doc.key]
-                        return (
-                          <div key={doc.key} style={{ ...s.docItem, ...(url ? s.docDone : {}) }}>
-                            <span style={{ fontSize: 14 }}>{doc.icon}</span>
-                            <span style={{ flex: 1, fontSize: 12, color: url ? '#e2e8f0' : '#64748b' }}>{doc.label}</span>
-                            {url
-                              ? <a href={url} target="_blank" rel="noreferrer" style={s.docLink}>Ver ↗</a>
-                              : <span style={{ fontSize: 11, color: '#334155' }}>Pendiente</span>}
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {REFS.some(r => candDocs[r.key]) && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 8 }}>Referencias</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {REFS.map(ref => {
-                            const val = candDocs[ref.key]
-                            if (!val) return null
-                            return (
-                              <div key={ref.key} style={{ ...s.docItem, ...s.docDone }}>
-                                <span style={{ fontSize: 14 }}>👤</span>
-                                <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 120, fontFamily: "'Outfit', sans-serif" }}>{ref.label}:</span>
-                                <span style={{ fontSize: 12, color: '#e2e8f0', fontFamily: "'Outfit', sans-serif" }}>{val}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        {loading
+          ? <div style={s.empty}><div style={s.pulse} /></div>
+          : <>
+            <Section
+              title="Aprobados para llamada" emoji="✅" color="#4ade80"
+              borderColor="rgba(74,222,128,0.2)" candidatos={aprobados}
+              emptyMsg="Sin aprobados aún" {...rowProps}
+            />
+            <Section
+              title="En proceso" emoji="⏳" color="#60a5fa"
+              borderColor="rgba(96,165,250,0.2)" candidatos={enProceso}
+              emptyMsg="Sin candidatos en proceso" {...rowProps}
+            />
+            <Section
+              title="Rechazados" emoji="❌" color="#f87171"
+              borderColor="rgba(248,113,113,0.2)" candidatos={rechazados}
+              emptyMsg="Sin rechazados" {...rowProps}
+            />
+          </>
+        }
       </div>
     </div>
   )
@@ -238,17 +275,13 @@ const s = {
   logoDot: { color: '#3b82f6' },
   logoSub: { color: '#475569', fontSize: 12, marginTop: 4, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' },
   refreshBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(30,58,138,0.15)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 32 },
   statCard: { background: 'rgba(15,23,42,0.8)', border: '1px solid', borderRadius: 12, padding: '20px 18px', backdropFilter: 'blur(10px)' },
   statNum: { fontFamily: "'Outfit', sans-serif", fontSize: 36, fontWeight: 700, lineHeight: 1, marginBottom: 6 },
   statLabel: { color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 12 },
   statBar: { height: 3, borderRadius: 99, overflow: 'hidden' },
   statBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.6s ease' },
-  filterRow: { display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' },
-  filterBtn: { background: 'transparent', border: '1px solid rgba(30,58,138,0.2)', color: '#475569', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontFamily: "'Outfit', sans-serif", cursor: 'pointer', letterSpacing: '0.03em' },
-  filterActive: { background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.4)', color: '#93c5fd' },
-  filterCount: { marginLeft: 'auto', color: '#334155', fontSize: 12, fontFamily: "'Outfit', sans-serif" },
-  table: { background: 'rgba(10,16,30,0.7)', border: '1px solid rgba(30,58,138,0.2)', borderRadius: 14, overflow: 'hidden', backdropFilter: 'blur(20px)' },
+  table: { background: 'rgba(10,16,30,0.7)', border: '1px solid', borderRadius: 14, overflow: 'hidden', backdropFilter: 'blur(20px)' },
   tableHead: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '10px 20px', borderBottom: '1px solid rgba(30,58,138,0.15)', color: '#334155', fontSize: 11, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase' },
   row: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '14px 20px', alignItems: 'center', borderBottom: '1px solid rgba(15,23,42,0.6)', cursor: 'pointer', transition: 'background 0.15s' },
   rowOpen: { background: 'rgba(30,58,138,0.06)', borderBottom: '1px solid rgba(30,58,138,0.15)' },
@@ -260,7 +293,7 @@ const s = {
   progressMini: { height: 3, background: 'rgba(30,58,138,0.2)', borderRadius: 99, overflow: 'hidden', marginTop: 4, width: 60, margin: '4px auto 0' },
   progressMiniFill: { height: '100%', background: '#3b82f6', borderRadius: 99 },
   dotsLabel: { color: '#64748b', fontSize: 11, fontFamily: "'Outfit', sans-serif" },
-  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' },
+  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif', letterSpacing: '0.03em' },
   chevron: { color: '#334155', fontSize: 10, textAlign: 'right' },
   empty: { padding: '48px', textAlign: 'center', display: 'flex', justifyContent: 'center' },
   pulse: { width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
