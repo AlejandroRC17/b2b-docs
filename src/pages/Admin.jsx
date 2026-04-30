@@ -41,7 +41,7 @@ function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFor
   const wasSent = sent[c.id]
 
   return (
-    <div key={c.id}>
+    <div>
       <div style={{ ...s.row, ...(isOpen ? s.rowOpen : {}) }} onClick={() => setSelected(isOpen ? null : c)}>
         <div style={s.candidateCell}>
           <div style={s.avatar}>{(c.nombre || 'C').charAt(0).toUpperCase()}</div>
@@ -119,7 +119,7 @@ function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFor
   )
 }
 
-function Section({ title, emoji, color, borderColor, candidatos, docs, sending, sent, selected, setSelected, enviarFormulario, emptyMsg }) {
+function Section({ title, emoji, color, borderColor, candidatos, emptyMsg, ...rowProps }) {
   const [collapsed, setCollapsed] = useState(false)
   return (
     <div style={{ marginBottom: 32 }}>
@@ -143,8 +143,7 @@ function Section({ title, emoji, color, borderColor, candidatos, docs, sending, 
           {candidatos.length === 0
             ? <div style={s.empty}><span style={{ color: '#475569', fontSize: 13 }}>{emptyMsg}</span></div>
             : candidatos.map(c => (
-              <CandidatoRow key={c.id} c={c} docs={docs} sending={sending} sent={sent}
-                selected={selected} setSelected={setSelected} enviarFormulario={enviarFormulario} />
+              <CandidatoRow key={c.id} c={c} {...rowProps} />
             ))
           }
         </div>
@@ -244,21 +243,15 @@ export default function Admin() {
         {loading
           ? <div style={s.empty}><div style={s.pulse} /></div>
           : <>
-            <Section
-              title="Aprobados para llamada" emoji="✅" color="#4ade80"
+            <Section title="Aprobados para llamada" emoji="✅" color="#4ade80"
               borderColor="rgba(74,222,128,0.2)" candidatos={aprobados}
-              emptyMsg="Sin aprobados aún" {...rowProps}
-            />
-            <Section
-              title="En proceso" emoji="⏳" color="#60a5fa"
+              emptyMsg="Sin aprobados aún" {...rowProps} />
+            <Section title="En proceso" emoji="⏳" color="#60a5fa"
               borderColor="rgba(96,165,250,0.2)" candidatos={enProceso}
-              emptyMsg="Sin candidatos en proceso" {...rowProps}
-            />
-            <Section
-              title="Rechazados" emoji="❌" color="#f87171"
+              emptyMsg="Sin candidatos en proceso" {...rowProps} />
+            <Section title="Rechazados" emoji="❌" color="#f87171"
               borderColor="rgba(248,113,113,0.2)" candidatos={rechazados}
-              emptyMsg="Sin rechazados" {...rowProps}
-            />
+              emptyMsg="Sin rechazados" {...rowProps} />
           </>
         }
       </div>
@@ -293,7 +286,7 @@ const s = {
   progressMini: { height: 3, background: 'rgba(30,58,138,0.2)', borderRadius: 99, overflow: 'hidden', marginTop: 4, width: 60, margin: '4px auto 0' },
   progressMiniFill: { height: '100%', background: '#3b82f6', borderRadius: 99 },
   dotsLabel: { color: '#64748b', fontSize: 11, fontFamily: "'Outfit', sans-serif" },
-  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif', letterSpacing: '0.03em' },
+  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' },
   chevron: { color: '#334155', fontSize: 10, textAlign: 'right' },
   empty: { padding: '48px', textAlign: 'center', display: 'flex', justifyContent: 'center' },
   pulse: { width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
