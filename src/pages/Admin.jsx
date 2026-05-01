@@ -159,6 +159,7 @@ export default function Admin() {
   const [selected, setSelected] = useState(null)
   const [sending, setSending] = useState({})
   const [sent, setSent] = useState({})
+  const [ciudadFiltro, setCiudadFiltro] = useState('todas')
 
   useEffect(() => { fetchAll() }, [])
 
@@ -198,15 +199,20 @@ export default function Admin() {
     setSending(p => ({ ...p, [c.id]: false }))
   }
 
-  const aprobados = candidatos.filter(c => c.chat_status === 'completado' || c.etapa === 'llamadas')
-  const rechazados = candidatos.filter(c => c.chat_status === 'rechazado')
-  const enProceso = candidatos.filter(c => c.chat_status !== 'completado' && c.etapa !== 'llamadas' && c.chat_status !== 'rechazado')
+  const ciudades = ['todas', ...Array.from(new Set(candidatos.map(c => c.ciudad).filter(Boolean))).sort()]
+
+  const filtrarPorCiudad = (lista) =>
+    ciudadFiltro === 'todas' ? lista : lista.filter(c => c.ciudad === ciudadFiltro)
+
+  const aprobados = filtrarPorCiudad(candidatos.filter(c => c.chat_status === 'completado' || c.etapa === 'llamadas'))
+  const rechazados = filtrarPorCiudad(candidatos.filter(c => c.chat_status === 'rechazado'))
+  const enProceso = filtrarPorCiudad(candidatos.filter(c => c.chat_status !== 'completado' && c.etapa !== 'llamadas' && c.chat_status !== 'rechazado'))
 
   const stats = {
     total: candidatos.length,
-    aprobados: aprobados.length,
-    rechazados: rechazados.length,
-    enProceso: enProceso.length,
+    aprobados: candidatos.filter(c => c.chat_status === 'completado' || c.etapa === 'llamadas').length,
+    rechazados: candidatos.filter(c => c.chat_status === 'rechazado').length,
+    enProceso: candidatos.filter(c => c.chat_status !== 'completado' && c.etapa !== 'llamadas' && c.chat_status !== 'rechazado').length,
   }
 
   const rowProps = { docs, sending, sent, selected, setSelected, enviarFormulario }
@@ -240,6 +246,16 @@ export default function Admin() {
           ))}
         </div>
 
+        <div style={s.filterRow}>
+          <span style={{ color: '#475569', fontSize: 12, fontFamily: "'Outfit', sans-serif" }}>🏙️ Ciudad:</span>
+          {ciudades.map(c => (
+            <button key={c} onClick={() => setCiudadFiltro(c)}
+              style={{ ...s.filterBtn, ...(ciudadFiltro === c ? s.filterActive : {}) }}>
+              {c === 'todas' ? 'Todas' : c}
+            </button>
+          ))}
+        </div>
+
         {loading
           ? <div style={s.empty}><div style={s.pulse} /></div>
           : <>
@@ -268,12 +284,15 @@ const s = {
   logoDot: { color: '#3b82f6' },
   logoSub: { color: '#475569', fontSize: 12, marginTop: 4, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' },
   refreshBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(30,58,138,0.15)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 32 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 },
   statCard: { background: 'rgba(15,23,42,0.8)', border: '1px solid', borderRadius: 12, padding: '20px 18px', backdropFilter: 'blur(10px)' },
   statNum: { fontFamily: "'Outfit', sans-serif", fontSize: 36, fontWeight: 700, lineHeight: 1, marginBottom: 6 },
   statLabel: { color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 12 },
   statBar: { height: 3, borderRadius: 99, overflow: 'hidden' },
   statBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.6s ease' },
+  filterRow: { display: 'flex', gap: 6, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' },
+  filterBtn: { background: 'transparent', border: '1px solid rgba(30,58,138,0.2)', color: '#475569', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
+  filterActive: { background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.4)', color: '#93c5fd' },
   table: { background: 'rgba(10,16,30,0.7)', border: '1px solid', borderRadius: 14, overflow: 'hidden', backdropFilter: 'blur(20px)' },
   tableHead: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '10px 20px', borderBottom: '1px solid rgba(30,58,138,0.15)', color: '#334155', fontSize: 11, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase' },
   row: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '14px 20px', alignItems: 'center', borderBottom: '1px solid rgba(15,23,42,0.6)', cursor: 'pointer', transition: 'background 0.15s' },
