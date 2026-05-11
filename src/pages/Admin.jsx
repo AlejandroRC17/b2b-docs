@@ -31,7 +31,27 @@ const statusConfig = {
   pendiente:  { color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', label: 'Pendiente' },
 }
 
-function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFormulario }) {
+// ─── CityTabs ─────────────────────────────────────────────────────────────────
+function CityTabs({ cities, active, onChange }) {
+  return (
+    <div style={s.tabsWrap}>
+      <div style={s.tabsScroll}>
+        {cities.map(city => (
+          <button
+            key={city}
+            onClick={() => onChange(city)}
+            style={{ ...s.tab, ...(active === city ? s.tabActive : {}) }}
+          >
+            {city === 'Todas' ? '🗺️ Todas' : `📍 ${city}`}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── CandidatoRow ─────────────────────────────────────────────────────────────
+function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFormulario, toggleLlamado, calling }) {
   const candDocs = docs[c.id] || {}
   const uploaded = DOCS.filter(d => candDocs[d.key]).length
   const status = c.form_status || 'pendiente'
@@ -39,14 +59,26 @@ function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFor
   const isOpen = selected?.id === c.id
   const isSending = sending[c.id]
   const wasSent = sent[c.id]
+  const isLlamado = c.call_status === 'llamado'
+  const isCalling = calling[c.id]
 
   return (
-    <div>
-      <div style={{ ...s.row, ...(isOpen ? s.rowOpen : {}) }} onClick={() => setSelected(isOpen ? null : c)}>
+    <div style={isLlamado ? s.rowLlamadoWrap : {}}>
+      <div
+        style={{ ...s.row, ...(isOpen ? s.rowOpen : {}), ...(isLlamado ? s.rowLlamado : {}) }}
+        onClick={() => setSelected(isOpen ? null : c)}
+      >
+        {isLlamado && <div style={s.llamadoStripe} />}
+
         <div style={s.candidateCell}>
-          <div style={s.avatar}>{(c.nombre || 'C').charAt(0).toUpperCase()}</div>
+          <div style={{ ...s.avatar, ...(isLlamado ? s.avatarLlamado : {}) }}>
+            {(c.nombre || 'C').charAt(0).toUpperCase()}
+          </div>
           <div>
-            <div style={s.name}>{c.nombre || 'Sin nombre'}</div>
+            <div style={s.name}>
+              {c.nombre || 'Sin nombre'}
+              {isLlamado && <span style={s.llamadoBadge}>✓ Llamado</span>}
+            </div>
             <div style={s.phone}>{c.telefono}</div>
           </div>
         </div>
@@ -71,6 +103,16 @@ function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFor
               <div style={s.phone}>{c.telefono} · {c.ciudad}</div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+
+              {/* ── Botón Ya llamado ── */}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleLlamado(c) }}
+                disabled={isCalling}
+                style={{ ...s.llamadoBtn, ...(isLlamado ? s.llamadoBtnActive : {}) }}
+              >
+                {isCalling ? '⏳' : isLlamado ? '📞 Ya llamado' : '📞 Marcar llamado'}
+              </button>
+
               <button
                 onClick={(e) => { e.stopPropagation(); enviarFormulario(c) }}
                 disabled={isSending || wasSent}
@@ -78,9 +120,12 @@ function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFor
               >
                 {isSending ? '⏳ Enviando...' : wasSent ? '✓ Enviado' : '📲 Enviar formulario'}
               </button>
-              <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>Ver form ↗</a>
+              <a href={`/upload?phone=${c.telefono}`} target="_blank" rel="noreferrer" style={s.viewLink}>
+                Ver form ↗
+              </a>
             </div>
           </div>
+
           <div style={s.docsList}>
             {DOCS.map(doc => {
               const url = candDocs[doc.key]
@@ -95,6 +140,7 @@ function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFor
               )
             })}
           </div>
+
           {REFS.some(r => candDocs[r.key]) && (
             <div style={{ marginTop: 12 }}>
               <div style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 8 }}>Referencias</div>
@@ -119,8 +165,12 @@ function CandidatoRow({ c, docs, sending, sent, selected, setSelected, enviarFor
   )
 }
 
+// ─── Section ──────────────────────────────────────────────────────────────────
 function Section({ title, emoji, color, borderColor, candidatos, emptyMsg, ...rowProps }) {
   const [collapsed, setCollapsed] = useState(false)
+  const llamados  = candidatos.filter(c => c.call_status === 'llamado').length
+  const pendientes = candidatos.length - llamados
+
   return (
     <div style={{ marginBottom: 32 }}>
       <div
@@ -130,6 +180,12 @@ function Section({ title, emoji, color, borderColor, candidatos, emptyMsg, ...ro
         <span style={{ fontSize: 18 }}>{emoji}</span>
         <span style={{ color, fontSize: 14, fontWeight: 700, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' }}>{title}</span>
         <span style={{ background: color + '22', color, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, fontFamily: "'Outfit', sans-serif" }}>{candidatos.length}</span>
+        {candidatos.length > 0 && (
+          <div style={s.sectionMiniStats}>
+            <span style={s.miniStatLlamado}>📞 {llamados}</span>
+            <span style={s.miniStatPendiente}>⏳ {pendientes}</span>
+          </div>
+        )}
         <span style={{ marginLeft: 'auto', color: '#334155', fontSize: 11 }}>{collapsed ? '▼' : '▲'}</span>
       </div>
       {!collapsed && (
@@ -142,9 +198,7 @@ function Section({ title, emoji, color, borderColor, candidatos, emptyMsg, ...ro
           </div>
           {candidatos.length === 0
             ? <div style={s.empty}><span style={{ color: '#475569', fontSize: 13 }}>{emptyMsg}</span></div>
-            : candidatos.map(c => (
-              <CandidatoRow key={c.id} c={c} {...rowProps} />
-            ))
+            : candidatos.map(c => <CandidatoRow key={c.id} c={c} {...rowProps} />)
           }
         </div>
       )}
@@ -152,19 +206,22 @@ function Section({ title, emoji, color, borderColor, candidatos, emptyMsg, ...ro
   )
 }
 
+// ─── Admin ────────────────────────────────────────────────────────────────────
 export default function Admin() {
   const [candidatos, setCandidatos] = useState([])
-  const [docs, setDocs] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(null)
-  const [sending, setSending] = useState({})
-  const [sent, setSent] = useState({})
+  const [docs, setDocs]             = useState({})
+  const [loading, setLoading]       = useState(true)
+  const [selected, setSelected]     = useState(null)
+  const [sending, setSending]       = useState({})
+  const [sent, setSent]             = useState({})
+  const [calling, setCalling]       = useState({})
+  const [cityTab, setCityTab]       = useState('Todas')
 
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
     setLoading(true)
-    const { data: cands } = await supabase.from('candidatos').select('*').order('created_at', { ascending: false })
+    const { data: cands }   = await supabase.from('candidatos').select('*').order('created_at', { ascending: false })
     const { data: allDocs } = await supabase.from('documentos').select('*')
     const docsMap = {}
     allDocs?.forEach(d => {
@@ -198,23 +255,51 @@ export default function Admin() {
     setSending(p => ({ ...p, [c.id]: false }))
   }
 
-  const aprobados = candidatos.filter(c => c.chat_status === 'completado' || c.etapa === 'llamadas')
-  const rechazados = candidatos.filter(c => c.chat_status === 'rechazado')
-  const enProceso = candidatos.filter(c => c.chat_status !== 'completado' && c.etapa !== 'llamadas' && c.chat_status !== 'rechazado')
-
-  const stats = {
-    total: candidatos.length,
-    aprobados: aprobados.length,
-    rechazados: rechazados.length,
-    enProceso: enProceso.length,
+  // ── Toggle llamado → guarda en Supabase ───────────────────────────────────
+  async function toggleLlamado(c) {
+    const nuevoStatus = c.call_status === 'llamado' ? 'pendiente' : 'llamado'
+    setCalling(p => ({ ...p, [c.id]: true }))
+    const { error } = await supabase
+      .from('candidatos')
+      .update({ call_status: nuevoStatus })
+      .eq('id', c.id)
+    if (!error) {
+      setCandidatos(prev =>
+        prev.map(x => x.id === c.id ? { ...x, call_status: nuevoStatus } : x)
+      )
+    }
+    setCalling(p => ({ ...p, [c.id]: false }))
   }
 
-  const rowProps = { docs, sending, sent, selected, setSelected, enviarFormulario }
+  const aprobados  = candidatos.filter(c => c.chat_status === 'completado' || c.etapa === 'llamadas')
+  const rechazados = candidatos.filter(c => c.chat_status === 'rechazado')
+  const enProceso  = candidatos.filter(c =>
+    c.chat_status !== 'completado' && c.etapa !== 'llamadas' && c.chat_status !== 'rechazado'
+  )
+
+  // Ciudades únicas de todos los candidatos
+  const cities = [
+    'Todas',
+    ...Array.from(new Set(candidatos.map(c => c.ciudad).filter(Boolean))).sort(),
+  ]
+
+  const filterCity = list =>
+    cityTab === 'Todas' ? list : list.filter(c => c.ciudad === cityTab)
+
+  const stats = {
+    total:      candidatos.length,
+    aprobados:  aprobados.length,
+    rechazados: rechazados.length,
+    enProceso:  enProceso.length,
+  }
+
+  const rowProps = { docs, sending, sent, selected, setSelected, enviarFormulario, toggleLlamado, calling }
 
   return (
     <div style={s.root}>
       <div style={s.gridBg} />
       <div style={s.wrap}>
+
         <header style={s.header}>
           <div>
             <div style={s.logo}>B2B <span style={s.logoDot}>Latam</span></div>
@@ -225,9 +310,9 @@ export default function Admin() {
 
         <div style={s.statsGrid}>
           {[
-            { label: 'Total', value: stats.total, accent: '#e2e8f0' },
-            { label: 'Aprobados', value: stats.aprobados, accent: '#4ade80' },
-            { label: 'En proceso', value: stats.enProceso, accent: '#60a5fa' },
+            { label: 'Total',      value: stats.total,      accent: '#e2e8f0' },
+            { label: 'Aprobados',  value: stats.aprobados,  accent: '#4ade80' },
+            { label: 'En proceso', value: stats.enProceso,  accent: '#60a5fa' },
             { label: 'Rechazados', value: stats.rechazados, accent: '#f87171' },
           ].map(s2 => (
             <div key={s2.label} style={{ ...s.statCard, borderColor: s2.accent + '22' }}>
@@ -240,18 +325,29 @@ export default function Admin() {
           ))}
         </div>
 
+        {/* Pestañas por ciudad */}
+        {!loading && cities.length > 1 && (
+          <CityTabs cities={cities} active={cityTab} onChange={city => { setCityTab(city); setSelected(null) }} />
+        )}
+
         {loading
           ? <div style={s.empty}><div style={s.pulse} /></div>
           : <>
             <Section title="Aprobados para llamada" emoji="✅" color="#4ade80"
-              borderColor="rgba(74,222,128,0.2)" candidatos={aprobados}
-              emptyMsg="Sin aprobados aún" {...rowProps} />
+              borderColor="rgba(74,222,128,0.2)"
+              candidatos={filterCity(aprobados)}
+              emptyMsg={cityTab === 'Todas' ? 'Sin aprobados aún' : `Sin aprobados en ${cityTab}`}
+              {...rowProps} />
             <Section title="En proceso" emoji="⏳" color="#60a5fa"
-              borderColor="rgba(96,165,250,0.2)" candidatos={enProceso}
-              emptyMsg="Sin candidatos en proceso" {...rowProps} />
+              borderColor="rgba(96,165,250,0.2)"
+              candidatos={filterCity(enProceso)}
+              emptyMsg={cityTab === 'Todas' ? 'Sin candidatos en proceso' : `Sin candidatos en proceso en ${cityTab}`}
+              {...rowProps} />
             <Section title="Rechazados" emoji="❌" color="#f87171"
-              borderColor="rgba(248,113,113,0.2)" candidatos={rechazados}
-              emptyMsg="Sin rechazados" {...rowProps} />
+              borderColor="rgba(248,113,113,0.2)"
+              candidatos={filterCity(rechazados)}
+              emptyMsg={cityTab === 'Todas' ? 'Sin rechazados' : `Sin rechazados en ${cityTab}`}
+              {...rowProps} />
           </>
         }
       </div>
@@ -259,46 +355,88 @@ export default function Admin() {
   )
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = {
-  root: { minHeight: '100vh', background: '#070b14', position: 'relative', overflow: 'hidden' },
-  gridBg: { position: 'fixed', inset: 0, zIndex: 0, backgroundImage: `linear-gradient(rgba(30,58,138,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(30,58,138,0.06) 1px, transparent 1px)`, backgroundSize: '40px 40px', pointerEvents: 'none' },
-  wrap: { position: 'relative', zIndex: 1, maxWidth: 960, margin: '0 auto', padding: '36px 24px 80px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 36, paddingBottom: 28, borderBottom: '1px solid rgba(30,58,138,0.25)' },
-  logo: { fontFamily: "'Outfit', sans-serif", fontSize: 22, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.5px' },
-  logoDot: { color: '#3b82f6' },
-  logoSub: { color: '#475569', fontSize: 12, marginTop: 4, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' },
-  refreshBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(30,58,138,0.15)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 32 },
-  statCard: { background: 'rgba(15,23,42,0.8)', border: '1px solid', borderRadius: 12, padding: '20px 18px', backdropFilter: 'blur(10px)' },
-  statNum: { fontFamily: "'Outfit', sans-serif", fontSize: 36, fontWeight: 700, lineHeight: 1, marginBottom: 6 },
-  statLabel: { color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 12 },
-  statBar: { height: 3, borderRadius: 99, overflow: 'hidden' },
+  root:        { minHeight: '100vh', background: '#070b14', position: 'relative', overflow: 'hidden' },
+  gridBg:      { position: 'fixed', inset: 0, zIndex: 0, backgroundImage: `linear-gradient(rgba(30,58,138,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(30,58,138,0.06) 1px, transparent 1px)`, backgroundSize: '40px 40px', pointerEvents: 'none' },
+  wrap:        { position: 'relative', zIndex: 1, maxWidth: 960, margin: '0 auto', padding: '36px 24px 80px' },
+  header:      { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 36, paddingBottom: 28, borderBottom: '1px solid rgba(30,58,138,0.25)' },
+  logo:        { fontFamily: "'Outfit', sans-serif", fontSize: 22, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.5px' },
+  logoDot:     { color: '#3b82f6' },
+  logoSub:     { color: '#475569', fontSize: 12, marginTop: 4, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' },
+  refreshBtn:  { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(30,58,138,0.15)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
+  statsGrid:   { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 },
+  statCard:    { background: 'rgba(15,23,42,0.8)', border: '1px solid', borderRadius: 12, padding: '20px 18px', backdropFilter: 'blur(10px)' },
+  statNum:     { fontFamily: "'Outfit', sans-serif", fontSize: 36, fontWeight: 700, lineHeight: 1, marginBottom: 6 },
+  statLabel:   { color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Outfit', sans-serif", marginBottom: 12 },
+  statBar:     { height: 3, borderRadius: 99, overflow: 'hidden' },
   statBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.6s ease' },
-  table: { background: 'rgba(10,16,30,0.7)', border: '1px solid', borderRadius: 14, overflow: 'hidden', backdropFilter: 'blur(20px)' },
+
+  // City tabs
+  tabsWrap:   { marginBottom: 28, borderBottom: '1px solid rgba(30,58,138,0.2)' },
+  tabsScroll: { display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' },
+  tab: {
+    background: 'transparent', border: 'none', borderBottom: '2px solid transparent',
+    color: '#475569', padding: '8px 16px 10px', fontSize: 12, fontFamily: "'Outfit', sans-serif",
+    fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', letterSpacing: '0.03em',
+    marginBottom: '-1px', transition: 'color 0.15s',
+  },
+  tabActive: { color: '#60a5fa', borderBottomColor: '#3b82f6' },
+
+  // Section mini stats
+  sectionMiniStats: { display: 'flex', gap: 6 },
+  miniStatLlamado:  { fontSize: 10, color: '#4ade80', background: 'rgba(74,222,128,0.08)', padding: '2px 8px', borderRadius: 20, fontFamily: "'Outfit', sans-serif" },
+  miniStatPendiente:{ fontSize: 10, color: '#64748b', background: 'rgba(100,116,139,0.08)', padding: '2px 8px', borderRadius: 20, fontFamily: "'Outfit', sans-serif" },
+
+  // Table
+  table:     { background: 'rgba(10,16,30,0.7)', border: '1px solid', borderRadius: 14, overflow: 'hidden', backdropFilter: 'blur(20px)' },
   tableHead: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '10px 20px', borderBottom: '1px solid rgba(30,58,138,0.15)', color: '#334155', fontSize: 11, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase' },
-  row: { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '14px 20px', alignItems: 'center', borderBottom: '1px solid rgba(15,23,42,0.6)', cursor: 'pointer', transition: 'background 0.15s' },
-  rowOpen: { background: 'rgba(30,58,138,0.06)', borderBottom: '1px solid rgba(30,58,138,0.15)' },
+
+  // Row
+  row:           { display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 36px', padding: '14px 20px', alignItems: 'center', borderBottom: '1px solid rgba(15,23,42,0.6)', cursor: 'pointer', transition: 'background 0.15s', position: 'relative' },
+  rowOpen:       { background: 'rgba(30,58,138,0.06)', borderBottom: '1px solid rgba(30,58,138,0.15)' },
+  rowLlamadoWrap:{ opacity: 0.72 },
+  rowLlamado:    { background: 'rgba(74,222,128,0.025)' },
+  llamadoStripe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: '#4ade80', borderRadius: '3px 0 0 3px' },
+
+  // Candidate cell
   candidateCell: { display: 'flex', alignItems: 'center', gap: 12 },
-  avatar: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Outfit', sans-serif", flexShrink: 0 },
-  name: { color: '#e2e8f0', fontSize: 13, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
-  phone: { color: '#475569', fontSize: 11, marginTop: 2, fontFamily: "'Outfit', sans-serif" },
-  ciudad: { color: '#64748b', fontSize: 12, fontFamily: "'Outfit', sans-serif" },
-  progressMini: { height: 3, background: 'rgba(30,58,138,0.2)', borderRadius: 99, overflow: 'hidden', marginTop: 4, width: 60, margin: '4px auto 0' },
+  avatar:        { width: 34, height: 34, borderRadius: '50%', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Outfit', sans-serif", flexShrink: 0 },
+  avatarLlamado: { background: 'rgba(74,222,128,0.1)', borderColor: 'rgba(74,222,128,0.25)', color: '#4ade80' },
+  name:          { color: '#e2e8f0', fontSize: 13, fontWeight: 500, fontFamily: "'Outfit', sans-serif", display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  phone:         { color: '#475569', fontSize: 11, marginTop: 2, fontFamily: "'Outfit', sans-serif" },
+  ciudad:        { color: '#64748b', fontSize: 12, fontFamily: "'Outfit', sans-serif" },
+
+  // Llamado badge (inline en nombre)
+  llamadoBadge: { fontSize: 10, color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', padding: '1px 7px', borderRadius: 20, fontWeight: 500, fontFamily: "'Outfit', sans-serif" },
+
+  // Botón llamado
+  llamadoBtn: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    background: 'rgba(100,116,139,0.1)', border: '1px solid rgba(100,116,139,0.2)',
+    color: '#64748b', padding: '7px 14px', borderRadius: 8, fontSize: 12,
+    fontWeight: 500, fontFamily: "'Outfit', sans-serif", cursor: 'pointer',
+  },
+  llamadoBtnActive: {
+    background: 'rgba(74,222,128,0.1)', borderColor: 'rgba(74,222,128,0.3)', color: '#4ade80',
+  },
+
+  progressMini:     { height: 3, background: 'rgba(30,58,138,0.2)', borderRadius: 99, overflow: 'hidden', marginTop: 4, width: 60, margin: '4px auto 0' },
   progressMiniFill: { height: '100%', background: '#3b82f6', borderRadius: 99 },
-  dotsLabel: { color: '#64748b', fontSize: 11, fontFamily: "'Outfit', sans-serif" },
-  badge: { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' },
-  chevron: { color: '#334155', fontSize: 10, textAlign: 'right' },
-  empty: { padding: '48px', textAlign: 'center', display: 'flex', justifyContent: 'center' },
-  pulse: { width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
-  detail: { background: 'rgba(7,11,20,0.8)', borderTop: '1px solid rgba(30,58,138,0.15)', padding: '16px 20px', borderBottom: '1px solid rgba(30,58,138,0.1)' },
-  detailTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(30,58,138,0.1)', gap: 12, flexWrap: 'wrap' },
-  waBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
-  waBtnSent: { background: 'rgba(74,222,128,0.08)', borderColor: 'rgba(74,222,128,0.2)', color: '#4ade80', cursor: 'default' },
-  viewLink: { color: '#60a5fa', fontSize: 12, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', padding: '5px 12px', borderRadius: 6, whiteSpace: 'nowrap' },
-  docsList: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
-  docItem: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(30,58,138,0.1)', background: 'rgba(15,23,42,0.5)' },
-  docDone: { borderColor: 'rgba(74,222,128,0.15)', background: 'rgba(74,222,128,0.04)' },
-  docLink: { color: '#4ade80', fontSize: 11, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", flexShrink: 0 },
+  dotsLabel:        { color: '#64748b', fontSize: 11, fontFamily: "'Outfit', sans-serif" },
+  badge:            { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, fontFamily: "'Outfit', sans-serif", letterSpacing: '0.03em' },
+  chevron:          { color: '#334155', fontSize: 10, textAlign: 'right' },
+  empty:            { padding: '48px', textAlign: 'center', display: 'flex', justifyContent: 'center' },
+  pulse:            { width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
+  detail:           { background: 'rgba(7,11,20,0.8)', borderTop: '1px solid rgba(30,58,138,0.15)', padding: '16px 20px', borderBottom: '1px solid rgba(30,58,138,0.1)' },
+  detailTop:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(30,58,138,0.1)', gap: 12, flexWrap: 'wrap' },
+  waBtn:            { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "'Outfit', sans-serif", cursor: 'pointer' },
+  waBtnSent:        { background: 'rgba(74,222,128,0.08)', borderColor: 'rgba(74,222,128,0.2)', color: '#4ade80', cursor: 'default' },
+  viewLink:         { color: '#60a5fa', fontSize: 12, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', padding: '5px 12px', borderRadius: 6, whiteSpace: 'nowrap' },
+  docsList:         { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
+  docItem:          { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(30,58,138,0.1)', background: 'rgba(15,23,42,0.5)' },
+  docDone:          { borderColor: 'rgba(74,222,128,0.15)', background: 'rgba(74,222,128,0.04)' },
+  docLink:          { color: '#4ade80', fontSize: 11, textDecoration: 'none', fontFamily: "'Outfit', sans-serif", flexShrink: 0 },
 }
 
 const style = document.createElement('style')
@@ -306,5 +444,6 @@ style.textContent = `
   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
   @keyframes spin { to { transform: rotate(360deg) } }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  button:hover { filter: brightness(1.15); }
 `
 document.head.appendChild(style)
